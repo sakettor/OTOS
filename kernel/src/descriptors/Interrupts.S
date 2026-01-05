@@ -24,7 +24,9 @@ interruptCommon:
 
     mov rdi, rsp
     mov rsi, cr2
+    sub rsp, 8
     call handleInterruptAsm
+    add rsp, 8
 
     pop r15
     pop r14

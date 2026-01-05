@@ -15,7 +15,7 @@ void print_logo() {
     print("  |   |       ____.... ....---         ||''''|____||_.|   |\n");
     print("  |   |       ....---- ----'''         ||'''''       ||  |'.\n");
     print("  |   ||'.    ....---- ----'''         ||o o o       ||  '. |       Old Technology Operating System\n");
-    print("  |   |'. |   ....---- ----'''         ||____......---|   | |       Version 0.2\n");
+    print("  |   |'. |   ....---- ----'''         ||____......---|   | |       Version 0.3\n");
     print("  |   | | |   ....---- ----'''         ||''''|____||_.|   | |       Res: 1280x720\n");
     print("  |   | | |   ....---- ----'''         ||'''''       ||   | |       Running through Usermode (Ring 3)\n");
     print("  |   | | |   ....---- ----'''         ||o o o       ||   | |       Syscalls active\n");

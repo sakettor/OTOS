@@ -2,7 +2,7 @@
 #include "../utils/utils.h"
 
 char kernel_stack[16384];
-char user_stack[4096] __attribute__((aligned(4096)));
+char *user_stack;
 
 extern void gdt_reload();
 extern void usermode_entry(uint64_t aeeeh, uint64_t idkkk);
@@ -11,6 +11,8 @@ extern uint64_t HHDM_OFFSET;
 extern void write(char* str, int col);
 extern uint64_t fb_size;
 extern uint64_t fb_addr;
+extern uint64_t kmalloc(uint64_t incr);
+uint64_t user_stack_top = 0;
 
 uint64_t rsp0_top = (uint64_t)kernel_stack + sizeof(kernel_stack);
 
@@ -110,6 +112,8 @@ void make_user_accessible(uintptr_t virt_addr) {
 }
 
 void gdt_init() {
+    user_stack = kmalloc(16384);
+    user_stack_top = (uint64_t)user_stack + 16384;
     gdt[0].raw = 0x0000000000000000; // null
     gdt[1].raw = 0x00af9b000000ffff; // kernel code
     gdt[2].raw = 0x00af93000000ffff; // kernel data
@@ -139,6 +143,4 @@ void gdt_init() {
     *(struct gdt_tss_ent*)&gdt[5] = tss_e;
     __asm__ volatile ("lgdt %0" : : "m"(gdtr));
     gdt_reload();
-    make_user_accessible((uint64_t)user_stack);
-    make_user_accessible((uint64_t)user_stack + 4095);
 }

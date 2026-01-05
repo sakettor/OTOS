@@ -22,6 +22,8 @@ extern struct search {
 };
 extern struct search tfs_search();
 
+char user[20] = "user";
+
 uint64_t tar_address = 0;
 
 // Set the base revision to 4, this is recommended as this is the latest
@@ -51,6 +53,12 @@ static volatile struct limine_framebuffer_request framebuffer_request = {
 __attribute__((used, section(".limine_requests")))
 static volatile struct limine_hhdm_request hhdm = {
     .id = LIMINE_HHDM_REQUEST_ID,
+    .revision = 0
+};
+
+__attribute__((used, section(".limine_requests")))
+volatile struct limine_memmap_request memmap = {
+    .id = LIMINE_MEMMAP_REQUEST_ID,
     .revision = 0
 };
 
@@ -241,13 +249,25 @@ void kmain(void) {
     );
     HHDM_OFFSET = hhdm.response->offset;
     fb_addr = framebuffer->address;
+    uint64_t cr4;
+    __asm__ volatile ("mov %%cr4, %0" : "=r"(cr4));
+    cr4 |= (1 << 9);
+    cr4 |= (1 << 10);
+    __asm__ volatile ("mov %0, %%cr4" :: "r"(cr4));
+    uint64_t cr0;
+    __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0));
+    cr0 &= ~(1 << 2);
+    cr0 |= (1 << 1);
+    __asm__ volatile ("mov %0, %%cr0" :: "r"(cr0));
+    bitmap_init();
+    setup_heap();
     load_idt();
     gdt_init();
+    tfs_fd_init();
     tar_address = module_request.response->modules[0]->address;
     for (int i = 0; i < 3000; i++) {
         int star_x = rand_between(0, 585456) % width;
         int star_y = rand_between(0, 4858934) % height;
-        // Draw a 1x1 white pixel (Star)
         framebuffer_ptr[star_y * (pitch / 4) + star_x] = 0xFFFFFF;
     }
     write("OTos booted. Launching command prompt...\n", WHITE);

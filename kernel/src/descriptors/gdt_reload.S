@@ -20,12 +20,31 @@ gdt_reload:
     ltr ax
     ret
 usermode_entry:
+    mov rsp, rsi
+    mov rsi, rsp
+    mov rbx, rcx
     push 0x23
     push rsi
     push 0x202
     push 0x1B
     push rdi
+    mov rdi, rdx
+    xor rax, rax
+    xor rcx, rcx
+    xor rbp, rbp
+    xor r8, r8
+    xor r9, r9
+    xor r10, r10
+    xor r11, r11
+    xor r12, r12
+    xor r13, r13
+    xor r14, r14
+    xor r15, r15
     mov ax, 0x23
     mov ds, ax
     mov es, ax
-    iretq 
+    xor ax, ax
+    mov fs, ax
+    mov gs, ax
+
+    iretq

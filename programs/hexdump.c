@@ -1,25 +1,22 @@
 #include <stdint.h>
 #include "lib.h"
 
-void main() {
-    char* filename;
-    asm ("mov %%rdx, %0;" : "=m"(filename));
-    
-    uint64_t var_rax;
-    
-    asm volatile (
-        "mov %1, %%rbx;"
-        "mov $6, %%rax;"
-        "int $0x80;"
-        : "=a"(var_rax)
-        : "r"(filename)
-        : "rbx", "memory"
-    );
-
-    if (var_rax != 0) {
-        print_h((char *)var_rax, 1020);
+void main(char* filename) {
+    int file = fopen(filename);
+    if (file == -1) {
+        print("hexdump: file not found: ");
+        print(filename);
         print("\n");
-        exit(0);
+        fclose(file);
+        exit(1);
     }
-    exit(1);
+    char *buffer = (char*)malloc(510);
+    memset(buffer, 0, 4096);
+    int bytes = fread(file, buffer, 510);
+    if (bytes > 0) {
+        print_h(buffer, bytes);
+    }
+    print("\n");
+    fclose(file);
+    exit(0);
 }

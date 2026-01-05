@@ -7,6 +7,8 @@
 #define BLUE 5
 #define WHITE 0
 
+extern char user[20];
+
 extern struct search {
     char* name;
     uint64_t size;
@@ -240,7 +242,6 @@ void write_hex(uint64_t val) {
 
 void kernel_panic(struct interrupt_frame* frame, uint64_t cr2) {
     int msg_count = sizeof(yourFaultMessages) / sizeof(char*);
-    write("\033[48;2;0;0;51m\033[2J\033[H", 0);
     write("\n~ ", RED);
     write(yourFaultMessages[rand_between(0, msg_count-1)], RED);
     write("\n---------------------------------------------------------------------\nYour system ran into an unrecoverable error.\nException: ", RED); 
@@ -257,8 +258,12 @@ void kernel_panic(struct interrupt_frame* frame, uint64_t cr2) {
     write(" | ", 0);
     write("CR2: ", RED); write_hex(cr2);
     write("\n", 0);
+    write("RBX: ", RED); write_hex(frame->rbx);
+    write(" | ", 0);
+    write("RAX: ", RED); write_hex(frame->rax);
+    write("\n", 0);
     write("Instruction at RIP: ", RED);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 20; i++) {
         char byte_str[4];
         if (frame->rip < 0x1000 || frame->rip > 0xFFFFFFFFFFFFFFFF - 0x1000) {
             write(" (Address unreadable)", YELLOW);
@@ -291,6 +296,7 @@ void handleInterruptAsm(struct interrupt_frame* frame, uint64_t cr2) {
     if (frame->intNo < 32) {
         if (int_saved_pos.rip != 0 && lives != 0) {
             if (frame->cs == 27) {
+                kernel_panic(frame, cr2);
                 write("Oopsie!\nSegmentation fault.\nFaulty instruction - ", YELLOW);
                 uint8_t *rip_ptr = (uint8_t *)frame->rip;
                 for (int i = 0; i < 10; i++) {
@@ -320,11 +326,10 @@ void handleInterruptAsm(struct interrupt_frame* frame, uint64_t cr2) {
             switch (frame->rax) {
                 case 1:
                     if (frame->rbx < 0x1000) {
-                        write("SYSCALL ERROR: RBX contains invalid pointer!\n", RED);
+                        write("kernel: tried to print from invalid pointer\n", RED);
                     } else {
-                        write((char*)frame->rbx, YELLOW);
+                        write((char*)frame->rbx, 0);
                     }
-                    
                     break;
                 case 2:
                     char* command_buf = (char*)frame->rbx;
@@ -390,16 +395,66 @@ void handleInterruptAsm(struct interrupt_frame* frame, uint64_t cr2) {
                     break;
                 case 5: // launch
                     int result = tfs_launch((char*)frame->rbx, (char*)frame->rdx);
-                    if (result == 1) {
+                    if (result == 0) {
                         write("File not found.\n", RED);
                     }
                     break;
                 case 6: // read
-                    struct search results = tfs_search((char*)frame->rbx);
-                    frame->rax = (uint64_t)results.data_address;
+                    int fd        = (int)frame->rbx;
+                    char* user_buf = (char*)frame->rdx;
+                    int count     = (int)frame->rcx;
+                    if ((uint64_t)user_buf >= 0xFFFF800000000000) {
+                        frame->rax = 0;
+                        break;
+                    }
+                    frame->rax = tfs_read(fd, user_buf, count);
                     break;
                 case 7: // dir
                     tfs_dir();
+                    break;
+                case 8: // allocation
+                    frame->rax = kmalloc(frame->rbx);
+                    break;
+                case 9: // file open
+                    frame->rax = tfs_open((char*)frame->rbx);
+                    break;
+                case 10: // file close
+                    frame->rax = tfs_close(frame->rbx);
+                    break;
+                case 11: // seek
+                    frame->rax = tfs_seek(frame->rbx, frame->rdx);
+                    break;
+                case 12: // tcb set
+                    frame->rax = 0;
+                    uint64_t fs_base = frame->rbx;
+                    write("Setting TCB base to: ", 0);
+                    write_hex(fs_base);
+                    if (fs_base == 0) {
+                        break;
+                    }
+
+                    uint32_t low = (uint32_t)fs_base;
+                    uint32_t high = (uint32_t)(fs_base >> 32);
+                    __asm__ volatile ("wrmsr" : : "a"(low), "d"(high), "c"(0xC0000100) : "memory");
+                    
+                    frame->rax = 0;
+                    write("\n", 0);
+                    break;
+                case 13: // syscall 1 but better :D | rbx - fd, rdx - buffer, rcx - size
+                    if (frame->rbx == 1 || frame->rbx == 2) {
+                        flanterm_write(ft_ctx, (char *)frame->rdx, frame->rcx);
+                        frame->rax = frame->rcx; 
+                    } else {
+                        frame->rax = 0;
+                    }
+                    break;
+                case 14: // user operations
+                    if (frame->rbx == 1) { // get username
+                        frame->rax = (char*)user;
+                    } else if (frame->rbx == 2) { // change username
+                        memcpy(user, frame->rdx, 19);
+                        frame->rax = (char*)user;
+                    }
                     break;
             }
         }
